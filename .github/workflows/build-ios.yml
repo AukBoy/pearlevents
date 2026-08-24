@@ -1,0 +1,51 @@
+name: Build iOS Native App (.ipa)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS Package on Cloud macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Production Bundle
+        run: npm run build
+
+      - name: Sync Capacitor iOS Assets
+        run: npx cap sync ios
+
+      - name: Build Xcode iOS Archive (.app / .ipa)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+      - name: Create Unsigned IPA Package
+        run: |
+          cd ios/App/build/Build/Products/Release-iphoneos
+          mkdir Payload
+          cp -r App.app Payload/
+          zip -r SurpriseDrive-iOS-Unsigned.ipa Payload
+
+      - name: Upload iOS IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SurpriseDrive-iOS-App
+          path: ios/App/build/Build/Products/Release-iphoneos/SurpriseDrive-iOS-Unsigned.ipa
+          retention-days: 30
