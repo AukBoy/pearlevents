@@ -206,11 +206,8 @@ export default function App() {
         onImportData={handleImportData}
       />
 
-      {/* Top Metrics Cards */}
-      <StatsOverview bookings={bookings} />
-
       {/* Main Tab Content */}
-      <main>
+      <main className="mb-6">
         {activeTab === 'table' && (
           <BookingTable 
             bookings={bookings}
@@ -239,6 +236,9 @@ export default function App() {
           <FinancialSummary bookings={bookings} />
         )}
       </main>
+
+      {/* Bottom Metrics Cards */}
+      <StatsOverview bookings={bookings} />
 
       {/* Modals */}
       <BookingModal 
