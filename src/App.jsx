@@ -22,13 +22,32 @@ export default function App() {
     return INITIAL_BOOKINGS;
   });
 
-  const [activeTab, setActiveTab] = useState('table'); // table, calendar, financials
+  const [activeTab, setActiveTab] = useState('table');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState(null);
   const [receiptBooking, setReceiptBooking] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Sync with LocalStorage
+  // Fetch bookings from Zircon Host MySQL API on mount
+  useEffect(() => {
+    const fetchFromAPI = async () => {
+      try {
+        const response = await fetch('/api/bookings.php');
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setBookings(data);
+            localStorage.setItem('surprise_drive_bookings', JSON.stringify(data));
+          }
+        }
+      } catch (err) {
+        console.log('API not reachable (running local fallback or dev mode)', err);
+      }
+    };
+    fetchFromAPI();
+  }, []);
+
+  // Save fallback to LocalStorage
   useEffect(() => {
     try {
       localStorage.setItem('surprise_drive_bookings', JSON.stringify(bookings));
@@ -42,23 +61,43 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Toggle Completion Status (✓)
-  const handleToggleStatus = (id) => {
-    setBookings(prev => prev.map(b => {
-      if (b.id === id) {
-        const newStatus = b.status === 'completed' ? 'pending' : 'completed';
-        showToast(newStatus === 'completed' ? `Booking #${b.refNo} Completed ✓` : `Booking #${b.refNo} Marked Pending`);
-        return { ...b, status: newStatus };
-      }
-      return b;
-    }));
+  // Toggle Completion Status (✓) with API sync
+  const handleToggleStatus = async (id) => {
+    const target = bookings.find(b => b.id === id);
+    if (!target) return;
+    const newStatus = target.status === 'completed' ? 'pending' : 'completed';
+    const updated = { ...target, status: newStatus };
+
+    setBookings(prev => prev.map(b => b.id === id ? updated : b));
+    showToast(newStatus === 'completed' ? `Booking #${target.refNo} Completed ✓` : `Booking #${target.refNo} Marked Pending`);
+
+    try {
+      await fetch(`/api/bookings.php?id=${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.error('API sync error', e);
+    }
   };
 
-  // Add or Update Booking
-  const handleSaveBooking = (bookingData) => {
+  // Add or Update Booking with API sync
+  const handleSaveBooking = async (bookingData) => {
     if (editingBooking) {
-      setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...bookingData, id: b.id } : b));
+      const updated = { ...bookingData, id: editingBooking.id };
+      setBookings(prev => prev.map(b => b.id === editingBooking.id ? updated : b));
       showToast(`Booking #${bookingData.refNo} updated`);
+
+      try {
+        await fetch(`/api/bookings.php?id=${editingBooking.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        });
+      } catch (e) {
+        console.error('API sync error', e);
+      }
     } else {
       const newBooking = {
         ...bookingData,
@@ -66,16 +105,40 @@ export default function App() {
       };
       setBookings(prev => [newBooking, ...prev]);
       showToast(`New Booking #${bookingData.refNo} added!`);
+
+      try {
+        const res = await fetch('/api/bookings.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bookingData)
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.id) {
+            setBookings(prev => prev.map(b => b.id === newBooking.id ? { ...newBooking, id: resData.id } : b));
+          }
+        }
+      } catch (e) {
+        console.error('API sync error', e);
+      }
     }
     setEditingBooking(null);
   };
 
-  // Delete Booking
-  const handleDeleteBooking = (id) => {
+  // Delete Booking with API sync
+  const handleDeleteBooking = async (id) => {
     const target = bookings.find(b => b.id === id);
     if (window.confirm(`Are you sure you want to delete Booking #${target?.refNo || ''}?`)) {
       setBookings(prev => prev.filter(b => b.id !== id));
       showToast(`Booking #${target?.refNo || ''} deleted`);
+
+      try {
+        await fetch(`/api/bookings.php?id=${id}`, {
+          method: 'DELETE'
+        });
+      } catch (e) {
+        console.error('API sync error', e);
+      }
     }
   };
 
