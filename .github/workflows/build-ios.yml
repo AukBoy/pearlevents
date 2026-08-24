@@ -31,29 +31,30 @@ jobs:
       - name: Sync Capacitor iOS Assets
         run: npx cap sync ios
 
-      - name: Resolve Xcode Swift Package Dependencies
+      - name: Build iOS Archive (.xcarchive)
         run: |
           cd ios/App
-          xcodebuild -resolvePackageDependencies -project App.xcodeproj
+          xcodebuild archive \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Build Xcode iOS App
+      - name: Package Unsigned IPA
         run: |
           cd ios/App
-          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM="" CODE_SIGN_ENTITLEMENTS=""
-
-      - name: Create Unsigned IPA & App Package
-        run: |
-          cd ios/App/build/Build/Products/Release-iphoneos
-          mkdir -p Payload
-          cp -r App.app Payload/
+          mkdir -p build/Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
           zip -r SurpriseDrive-iOS-Unsigned.ipa Payload
-          zip -r SurpriseDrive-iOS-AppBundle.zip App.app
 
-      - name: Upload iOS App Artifacts
+      - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SurpriseDrive-iOS-App
-          path: |
-            ios/App/build/Build/Products/Release-iphoneos/SurpriseDrive-iOS-Unsigned.ipa
-            ios/App/build/Build/Products/Release-iphoneos/SurpriseDrive-iOS-AppBundle.zip
+          path: ios/App/build/SurpriseDrive-iOS-Unsigned.ipa
           retention-days: 30
