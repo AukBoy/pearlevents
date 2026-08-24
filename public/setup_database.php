@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->exec($seedSql);
             }
 
-            // 4. Save config.php
+            // 4. Save config.php in both /api/ and root
             $configContent = "<?php\n" .
                 "define('DB_HOST', " . var_export($dbHost, true) . ");\n" .
                 "define('DB_USER', " . var_export($dbUser, true) . ");\n" .
@@ -85,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "}\n" .
                 "?>";
 
-            file_put_contents(__DIR__ . '/config.php', $configContent);
+            @file_put_contents(__DIR__ . '/api/config.php', $configContent);
+            @file_put_contents(__DIR__ . '/config.php', $configContent);
 
             $msg = "🎉 Database Connected & Configured Successfully! All 13 paper ledger bookings imported into Zircon Host MySQL!";
             $status = "success";
